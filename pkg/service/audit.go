@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"github.com/Onelvay/halyklife-test-task/pkg/domain"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	_ "go.mongodb.org/mongo-driver/mongo"
 )
@@ -15,7 +16,16 @@ func NewAuditServer(db *mongo.Collection) *AuditServer {
 	return &AuditServer{db}
 }
 
-func (a *AuditServer) Log(ctx context.Context, log domain.Log) error {
+func (a *AuditServer) Log(ctx context.Context, log domain.Log) {
 	_, err := a.db.InsertOne(ctx, log)
-	return err
+	if err != nil {
+		panic(err)
+	}
+
+}
+func (a *AuditServer) LogResponse(body string) {
+	_, err := a.db.InsertOne(context.Background(), bson.M{"RESPONSE": body})
+	if err != nil {
+		panic(err)
+	}
 }

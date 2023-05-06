@@ -2,9 +2,9 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"github.com/Onelvay/halyklife-test-task/pkg/domain"
 	"github.com/Onelvay/halyklife-test-task/pkg/service"
+	"github.com/Onelvay/halyklife-test-task/transport"
 	"github.com/google/uuid"
 	"github.com/spf13/viper"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -36,15 +36,15 @@ func handlerProxy(w http.ResponseWriter, r *http.Request) {
 		panic(err)
 	}
 	proxy := httputil.NewSingleHostReverseProxy(serverUrl)
+	proxy.Transport = &transport.Transport{audit}
 
 	id := uuid.New().String()
 	log := domain.Log{id, r.Method, time.Now()}
 
-	if err := audit.Log(context.Background(), log); err != nil {
-		fmt.Println(err)
-	}
+	go audit.Log(context.Background(), log)
 
 	r.Header.Set("X-Request-Id", id)
+
 	proxy.ServeHTTP(w, r)
 }
 
@@ -60,6 +60,7 @@ func Init() {
 	}
 	collection := client.Database("log").Collection("log")
 	audit = service.NewAuditServer(collection)
+
 }
 
 // config
