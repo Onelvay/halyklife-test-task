@@ -3,8 +3,8 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/Onelvay/halyklife-test-task/internal/service"
 	"github.com/Onelvay/halyklife-test-task/pkg/domain"
+	"github.com/Onelvay/halyklife-test-task/pkg/service"
 	"github.com/google/uuid"
 	"github.com/spf13/viper"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -16,22 +16,13 @@ import (
 	"time"
 )
 
-var proxy *httputil.ReverseProxy
 var audit *service.AuditServer
 
 func main() {
-	if err := initConfig(); err != nil { //config
+	if err := initConfig(); err != nil {
 		log.Fatal(err)
 	}
-
-	Init() //инициализация монгодб и структуры логирования
-
-	serverUrl, err := url.Parse("http://localhost:8000") //серверхост
-	if err != nil {
-		panic(err)
-	}
-	proxy = httputil.NewSingleHostReverseProxy(serverUrl)
-
+	Init()
 	http.HandleFunc("/", handlerProxy)
 	if err := http.ListenAndServe(":8080", nil); err != nil {
 		panic(err)
@@ -40,15 +31,24 @@ func main() {
 }
 
 func handlerProxy(w http.ResponseWriter, r *http.Request) {
-	id := uuid.New()
-	log := domain.Log{id.String(), r.Method, time.Now()}
-	fmt.Println(log)
+	serverUrl, err := url.Parse("http://localhost:8000") //серверхост
+	if err != nil {
+		panic(err)
+	}
+	proxy := httputil.NewSingleHostReverseProxy(serverUrl)
+
+	id := uuid.New().String()
+	log := domain.Log{id, r.Method, time.Now()}
+
 	if err := audit.Log(context.Background(), log); err != nil {
 		fmt.Println(err)
 	}
+
+	r.Header.Set("X-Request-Id", id)
 	proxy.ServeHTTP(w, r)
 }
 
+// инициализация монгодб и структуры логирования
 func Init() {
 	client, err := mongo.NewClient(options.Client().ApplyURI(viper.GetString("mongoDB.host")))
 	if err != nil {
@@ -62,6 +62,7 @@ func Init() {
 	audit = service.NewAuditServer(collection)
 }
 
+// config
 func initConfig() error {
 	viper.AddConfigPath("config")
 	viper.SetConfigName("config")
